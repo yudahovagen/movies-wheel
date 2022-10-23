@@ -10,6 +10,9 @@ const IMG_URL = "https://image.tmdb.org/t/p/original";
 let favoriteMovies = localStorage.favoriteMovies;
 favoriteMovies = favoriteMovies ? JSON.parse(favoriteMovies) : {};
 
+const modalContainer = document.querySelector(".modal-container");
+const modal = document.querySelector(".modal");
+
 const fetchItems = async (url) => {
   try {
     const response = await axios.get(`${url}${API_KEY}`);
@@ -47,7 +50,7 @@ function getStatsChildren(statsContainer, movie) {
   statsContainer.appendChild(vote_count);
 }
 
-function createMovieCard(movie, modal, modalContainer) {
+function createMovieCard(movie, closeModuleEvent) {
   const moviePoster = document.createElement("img");
   moviePoster.src = IMG_URL + movie.poster_path;
   moviePoster.className = "movie-image";
@@ -103,12 +106,6 @@ function createMovieCard(movie, modal, modalContainer) {
     closeButton.className = "close-modal";
     closeButton.innerText = "X";
 
-    const closeModuleEvent = () => {
-      modal.style.display = "none";
-      modalContainer.style.display = "none";
-      document.body.style.overflow = "visible";
-    };
-
     closeButton.addEventListener("click", () => {
       if (modalContainer) {
         modalContainer.removeEventListener("click", onModalClick);
@@ -137,7 +134,7 @@ function createMovieCard(movie, modal, modalContainer) {
     const onModalClick = function (e) {
       //we need to check that we actually clicked the modal container and not the modal itself
       if (e.target === modalContainer) {
-        //first we need to remove the event since the modale container is shared
+        //first we need to remove the event since the modal container is shared
         modalContainer.removeEventListener("click", onModalClick);
         //exit display modal
         closeModuleEvent();
@@ -155,29 +152,57 @@ const main = async () => {
     fetchItems(API_URL_POPULAR),
     fetchItems(API_URL_NOW_PLAYING),
   ]);
-  //the reason we dont use onLoad is that its wait for styles and images and we only want to html elements
+  //the reason we do not use onLoad is that its wait for styles and images and we only want to html elements
   window.addEventListener("DOMContentLoaded", async () => {
     const [popularData, nowPlayingData] = await requestAll;
 
-    const modalContainer = document.querySelector(".modal-container");
-    const modal = document.querySelector(".modal");
-    const contant = document.querySelector(".contant");
-
+    // const modalContainer = document.querySelector(".modal-container");
+    // const modal = document.querySelector(".modal");
+    const content = document.querySelector(".content");
     if (!popularData) {
       return;
     }
-    popularData.forEach((movie) => {
-      contant.appendChild(createMovieCard(movie, modal, modalContainer));
-    });
 
     const selectOptions = document.querySelector(".filter-movies");
+    const closeModuleEvent = () => {
+      modal.style.display = "none";
+      modalContainer.style.display = "none";
+      document.body.style.overflow = "visible";
+      if (selectOptions.value === "Favorites") {
+        content.innerHTML = "";
+        loadFavorites();
+      }
+    };
+    popularData.forEach((movie) => {
+      content.appendChild(createMovieCard(movie, closeModuleEvent));
+    });
+    const loadFavorites = function () {
+      const filterData = popularData
+        .filter((movie) => favoriteMovies[movie.id])
+        .map((movie) => {
+          content.appendChild(createMovieCard(movie, closeModuleEvent));
+
+          return movie.id;
+        });
+      if (nowPlayingData) {
+        nowPlayingData
+          .filter(
+            (movie) =>
+              favoriteMovies[movie.id] && !filterData.includes(movie.id)
+          )
+          .forEach((movie) => {
+            content.appendChild(createMovieCard(movie));
+          });
+      }
+    };
+
     selectOptions.addEventListener("change", async () => {
       //clear the movies container
-      contant.innerHTML = "";
+      content.innerHTML = "";
       if (selectOptions.value === "Popular") {
         //render the most popular movies
         popularData.forEach((movie) => {
-          contant.appendChild(createMovieCard(movie, modal, modalContainer));
+          content.appendChild(createMovieCard(movie, closeModuleEvent));
         });
       }
       if (selectOptions.value === "Now Playing") {
@@ -186,29 +211,11 @@ const main = async () => {
         }
         //render the movies that are playing right now
         nowPlayingData.forEach((movie) => {
-          contant.appendChild(createMovieCard(movie, modal, modalContainer));
+          content.appendChild(createMovieCard(movie, closeModuleEvent));
         });
       }
       if (selectOptions.value === "Favorites") {
-        const filterData = popularData
-          .filter((movie) => favoriteMovies[movie.id])
-          .map((movie) => {
-            contant.appendChild(createMovieCard(movie, modal, modalContainer));
-
-            return movie.id;
-          });
-        if (nowPlayingData) {
-          nowPlayingData
-            .filter(
-              (movie) =>
-                favoriteMovies[movie.id] && !filterData.includes(movie.id)
-            )
-            .forEach((movie) => {
-              contant.appendChild(
-                createMovieCard(movie, modal, modalContainer)
-              );
-            });
-        }
+        loadFavorites();
       }
     });
   });
