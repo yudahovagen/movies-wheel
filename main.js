@@ -1,10 +1,6 @@
-import axios from "axios";
-
 const API_URL_POPULAR = `https://api.themoviedb.org/3/movie/popular?language=en-US&api_key=`;
 const API_URL_NOW_PLAYING = `https://api.themoviedb.org/3/movie/now_playing?language=en-US&api_key=`;
-//we should use .env file for the api key
 const API_KEY = `2c46288716a18fb7aadcc2a801f3fc6b`;
-//IMG_URL takes the poster path or the backdrop path
 const IMG_URL = "https://image.tmdb.org/t/p/original";
 
 let favoriteMovies = localStorage.favoriteMovies;
@@ -13,10 +9,11 @@ favoriteMovies = favoriteMovies ? JSON.parse(favoriteMovies) : {};
 const modalContainer = document.querySelector(".modal-container");
 const modal = document.querySelector(".modal");
 
-const fetchItems = async (url) => {
+const getItems = async (url) => {
   try {
-    const response = await axios.get(`${url}${API_KEY}`);
-    return response.data.results;
+    const response = await fetch(`${url}${API_KEY}`);
+    const data = await response.json();
+    return data.results;
   } catch (err) {
     console.log(err);
   }
@@ -50,7 +47,7 @@ function getStatsChildren(statsContainer, movie) {
   statsContainer.appendChild(vote_count);
 }
 
-function createMovieCard(movie, closeModuleEvent) {
+function createMovieCard(movie, closeModuleEvent) {  
   const moviePoster = document.createElement("img");
   moviePoster.src = IMG_URL + movie.poster_path;
   moviePoster.className = "movie-image";
@@ -86,10 +83,12 @@ function createMovieCard(movie, closeModuleEvent) {
         favoriteMovies[movie.id] = 1;
       }
       localStorage.favoriteMovies = JSON.stringify(favoriteMovies);
-      //after that we want to close the modal
+
       if (modalContainer) {
         modalContainer.removeEventListener("click", onModalClick);
       }
+
+      //after that we want to close the modal
       closeModuleEvent();
     });
 
@@ -134,9 +133,7 @@ function createMovieCard(movie, closeModuleEvent) {
     const onModalClick = function (e) {
       //we need to check that we actually clicked the modal container and not the modal itself
       if (e.target === modalContainer) {
-        //first we need to remove the event since the modal container is shared
         modalContainer.removeEventListener("click", onModalClick);
-        //exit display modal
         closeModuleEvent();
       }
     };
@@ -149,21 +146,21 @@ function createMovieCard(movie, closeModuleEvent) {
 const main = async () => {
   //we might need nowPlayingData if a user already picked one of the movies as a favorite from now playing
   const requestAll = Promise.all([
-    fetchItems(API_URL_POPULAR),
-    fetchItems(API_URL_NOW_PLAYING),
+    getItems(API_URL_POPULAR),
+    getItems(API_URL_NOW_PLAYING),
   ]);
   //the reason we do not use onLoad is that its wait for styles and images and we only want to html elements
   window.addEventListener("DOMContentLoaded", async () => {
     const [popularData, nowPlayingData] = await requestAll;
 
-    // const modalContainer = document.querySelector(".modal-container");
-    // const modal = document.querySelector(".modal");
     const content = document.querySelector(".content");
+
     if (!popularData) {
       return;
     }
 
     const selectOptions = document.querySelector(".filter-movies");
+
     const closeModuleEvent = () => {
       modal.style.display = "none";
       modalContainer.style.display = "none";
@@ -173,17 +170,22 @@ const main = async () => {
         loadFavorites();
       }
     };
+
     popularData.forEach((movie) => {
       content.appendChild(createMovieCard(movie, closeModuleEvent));
     });
+
+    //this function render the favorites movies 
     const loadFavorites = function () {
+      //first we take all the favorites from the popular movies
       const filterData = popularData
         .filter((movie) => favoriteMovies[movie.id])
         .map((movie) => {
           content.appendChild(createMovieCard(movie, closeModuleEvent));
-
           return movie.id;
         });
+      //now we take all the favorites from the now playing movies
+      //while making sure we don't make doubles
       if (nowPlayingData) {
         nowPlayingData
           .filter(
@@ -191,7 +193,7 @@ const main = async () => {
               favoriteMovies[movie.id] && !filterData.includes(movie.id)
           )
           .forEach((movie) => {
-            content.appendChild(createMovieCard(movie));
+            content.appendChild(createMovieCard(movie, closeModuleEvent));
           });
       }
     };
